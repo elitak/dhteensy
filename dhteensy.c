@@ -28,7 +28,8 @@
 #include "usb_keyboard_debug.h"
 #include "print.h"
 
-#include "keymaps.h"
+#include "dhkeys.h"
+#include "keymaps-elitak.h"
 
 #define CPU_PRESCALE(n)	(CLKPR = 0x80, CLKPR = (n))
 
