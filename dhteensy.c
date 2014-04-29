@@ -21,6 +21,11 @@
  * THE SOFTWARE.
  */
 
+#define LED_NAS  0x0E //1110
+#define LED_NORM 0x0D //1101
+#define LED_FN   0x0B //1011
+#define LED_10K  0x07 //0111
+
 #include <avr/io.h>
 #include <avr/pgmspace.h>
 #include <avr/interrupt.h>
@@ -53,22 +58,17 @@ uint8_t mode_track_last_n=0;
 void reload(void);
 
 void init_ports(void) {
-	/* led PB6-0 PE7 write only, covered below*/
-	/* only using E for writing */
-	/* DDRE=0xFF; */
+	// led pins PB6-0 PE7 are write only
+        // 2 pins of portE are part of either datahand port (keys, leds)
 	DDRE=0x81; /* 10000001 */
 	/* only using B for writing */
 	DDRB=0xFF;
 	/* D is mixed 0,1 write, 2,3,4,5 read*/
 	DDRD=0x03; /* 00000011 */
 
-	/* // ground maybe? */
-	/* DDRC=0xFF; */
-	/* PORTC=0x00; */
-
-	/* // led? */
-	/* DDRB=0xFF; */
-	/* PORTB=0x00; */
+	// maybe these pins should be grounded?
+	//DDRC=0xFF;
+	//PORTC=0x00;
 }
 
 void set_selector(uint8_t selector) {
@@ -81,34 +81,10 @@ void set_selector(uint8_t selector) {
 	   teensy:
 	   PE0, PB7, PD0, PD1
 	*/
-
-	/* bit 0 */
-	if (selector & (1<<0)) {
-		PORTE |= (1<<0);
-	} else {
-		PORTE &= ~(1<<0);
-	}
-
-	/* bit 1 */
-	if (selector & (1<<1)) {
-		PORTB |= (1<<7);
-	} else {
-		PORTB &= ~(1<<7);
-	}
-
-	/* bit 2 */
-	if (selector & (1<<2)) {
-		PORTD |= (1<<0);
-	} else {
-		PORTD &= ~(1<<0);
-	}
-
-	/* bit 3 */
-	if (selector & (1<<3)) {
-		PORTD |= (1<<1);
-	} else {
-		PORTD &= ~(1<<1);
-	}
+        PORTE = (PORTE & ~(1<<0)) | (!!(selector & 1<<0) << 0);
+        PORTB = (PORTB & ~(1<<7)) | (!!(selector & 1<<1) << 7);
+        PORTD = (PORTD & ~(1<<0)) | (!!(selector & 1<<2) << 0);
+        PORTD = (PORTD & ~(1<<1)) | (!!(selector & 1<<3) << 1);
 }
 
 uint8_t read_keys(void) {
@@ -120,13 +96,8 @@ uint8_t read_keys(void) {
 	   PD2,PD3,PD4,PD5
 	*/
 
-	uint8_t b;
-
-	// read all port B pins
-	b = PIND;
-	b &= 0x3C; /* 00111100 */
-	b >>= 2;
-	return(b);
+	// read port D pins 2 to 5
+	return PIND>>2 & 0x0F;
 }
 
 uint8_t scan_line(uint8_t selector) {
@@ -149,63 +120,18 @@ void set_led(uint8_t led) {
 	  DB 0Bh	;03h Function mode 1011
 
 	*/
-	//	PORTB=(led & 0x7f);
 
-	/* bit 0 */
-	if (led & (1<<0)) {
-		PORTB |= (1<<6);
-	} else {
-		PORTB &= ~(1<<6);
-	}
+        // the below remaps the led bits into the order the pins appear on the bus
 
-	/* bit 1 */
-	if (led & (1<<1)) {
-		PORTB |= (1<<5);
-	} else {
-		PORTB &= ~(1<<5);
-	}
+        PORTB = 0;
+        // the 7 least signifigant bits are on PB0-6 but need to be reversed
+        for (uint8_t i = 0; i < 7; i++) {
+            PORTB <<= 1;
+            PORTB |= led>>i & 1;
+        }
 
-	/* bit 2 */
-	if (led & (1<<2)) {
-		PORTB |= (1<<4);
-	} else {
-		PORTB &= ~(1<<4);
-	}
-
-	/* bit 3 */
-	if (led & (1<<3)) {
-		PORTB |= (1<<3);
-	} else {
-		PORTB &= ~(1<<3);
-	}
-
-	/* bit 4 */
-	if (led & (1<<4)) {
-		PORTB |= (1<<2);
-	} else {
-		PORTB &= ~(1<<2);
-	}
-
-	/* bit 5 */
-	if (led & (1<<5)) {
-		PORTB |= (1<<1);
-	} else {
-		PORTB &= ~(1<<1);
-	}
-
-	/* bit 6 */
-	if (led & (1<<6)) {
-		PORTB |= (1<<0);
-	} else {
-		PORTB &= ~(1<<0);
-	}
-
-	/* bit 7 */
-	if (led & (1<<7)) {
-		PORTE |= (1<<7);
-	} else {
-		PORTE &= ~(1<<7);
-	}
+        // the most significant bit is on PE7
+        PORTE |= !!(led&(1<<7)) << 7;
 }
 
 uint8_t process_keys(void) {
@@ -261,13 +187,13 @@ uint8_t process_keys(void) {
 	// set mode LEDs
 	switch(mode) {
 	case MODE_NORMAL:
-		set_led(0x0D); // normal
+		set_led(LED_NORM);
 		break;
 	case MODE_NAS:
-		set_led(0x0E); // NAS
+		set_led(LED_NAS);
 		break;
 	case MODE_FN:
-		set_led(0x0B); // FN
+		set_led(LED_FN);
 		break;
 	}
 
