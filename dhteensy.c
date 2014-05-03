@@ -21,10 +21,12 @@
  * THE SOFTWARE.
  */
 
-#define LED_NAS  0x0E //1110
-#define LED_NORM 0x0D //1101
-#define LED_FN   0x0B //1011
-#define LED_10K  0x07 //0111
+// These are masks. Unset bits are illuminated, so you'll likely want to use
+// the 1's complement of these values.
+#define LED_NAS  0x01
+#define LED_NORM 0x02
+#define LED_FN   0x04
+#define LED_10K  0x08
 
 #include <avr/io.h>
 #include <avr/pgmspace.h>
@@ -57,47 +59,96 @@ uint8_t mode_track_last_n=0;
 
 void reload(void);
 
-void init_ports(void) {
-	// led pins PB6-0 PE7 are write only
-        // 2 pins of portE are part of either datahand port (keys, leds)
-	DDRE=0x81; /* 10000001 */
-	/* only using B for writing */
-	DDRB=0xFF;
-	/* D is mixed 0,1 write, 2,3,4,5 read*/
-	DDRD=0x03; /* 00000011 */
+void port0_init(uint8_t mask) {
+        DDRB = (DDRB & ~(1<<6)) | (!!(mask & 1<<0) << 6);
+        DDRB = (DDRB & ~(1<<5)) | (!!(mask & 1<<1) << 5);
+        DDRB = (DDRB & ~(1<<4)) | (!!(mask & 1<<2) << 4);
+        DDRB = (DDRB & ~(1<<3)) | (!!(mask & 1<<3) << 3);
+        DDRB = (DDRB & ~(1<<2)) | (!!(mask & 1<<4) << 2);
+        DDRB = (DDRB & ~(1<<1)) | (!!(mask & 1<<5) << 1);
+        DDRB = (DDRB & ~(1<<0)) | (!!(mask & 1<<6) << 0);
+        DDRE = (DDRE & ~(1<<7)) | (!!(mask & 1<<7) << 7);
+}
 
-	// maybe these pins should be grounded?
-	//DDRC=0xFF;
-	//PORTC=0x00;
+void port0_write(uint8_t data) {
+        PORTB = (PORTB & ~(1<<6)) | (!!(data & 1<<0) << 6);
+        PORTB = (PORTB & ~(1<<5)) | (!!(data & 1<<1) << 5);
+        PORTB = (PORTB & ~(1<<4)) | (!!(data & 1<<2) << 4);
+        PORTB = (PORTB & ~(1<<3)) | (!!(data & 1<<3) << 3);
+        PORTB = (PORTB & ~(1<<2)) | (!!(data & 1<<4) << 2);
+        PORTB = (PORTB & ~(1<<1)) | (!!(data & 1<<5) << 1);
+        PORTB = (PORTB & ~(1<<0)) | (!!(data & 1<<6) << 0);
+        PORTE = (PORTE & ~(1<<7)) | (!!(data & 1<<7) << 7);
+}
+
+void port1_init(uint8_t mask) {
+        // PE0, PB7, PD0-6
+        DDRE = (DDRE & ~(1<<0)) | (!!(mask & 1<<0) << 0);
+        DDRB = (DDRB & ~(1<<7)) | (!!(mask & 1<<1) << 7);
+        DDRD = (DDRD & ~(1<<0)) | (!!(mask & 1<<2) << 0);
+        DDRD = (DDRD & ~(1<<1)) | (!!(mask & 1<<3) << 1);
+        DDRD = (DDRD & ~(1<<2)) | (!!(mask & 1<<4) << 2);
+        DDRD = (DDRD & ~(1<<3)) | (!!(mask & 1<<5) << 3);
+        DDRD = (DDRD & ~(1<<4)) | (!!(mask & 1<<6) << 4);
+        DDRD = (DDRD & ~(1<<5)) | (!!(mask & 1<<7) << 5);
+}
+
+void port1_write(uint8_t data) {
+        PORTE = (PORTE & ~(1<<0)) | (!!(data & 1<<0) << 0);
+        PORTB = (PORTB & ~(1<<7)) | (!!(data & 1<<1) << 7);
+        PORTD = (PORTD & ~(1<<0)) | (!!(data & 1<<2) << 0);
+        PORTD = (PORTD & ~(1<<1)) | (!!(data & 1<<3) << 1);
+        PORTD = (PORTD & ~(1<<2)) | (!!(data & 1<<4) << 2);
+        PORTD = (PORTD & ~(1<<3)) | (!!(data & 1<<5) << 3);
+        PORTD = (PORTD & ~(1<<4)) | (!!(data & 1<<6) << 4);
+        PORTD = (PORTD & ~(1<<5)) | (!!(data & 1<<7) << 5);
+}
+
+uint8_t port1_read(void) {
+        uint8_t acc = 0;
+        acc |= !!(PIND & 1<<5); acc <<= 1;
+        acc |= !!(PIND & 1<<4); acc <<= 1;
+        acc |= !!(PIND & 1<<3); acc <<= 1;
+        acc |= !!(PIND & 1<<2); acc <<= 1;
+        acc |= !!(PIND & 1<<1); acc <<= 1;
+        acc |= !!(PIND & 1<<0); acc <<= 1;
+        acc |= !!(PINB & 1<<7); acc <<= 1;
+        acc |= !!(PINE & 1<<0);
+        return acc;
+}
+
+void port2_init(uint8_t mask) {
+        // same pins but reverse order
+        DDRF = 0;
+        for (uint8_t i = 0; i < 8; i++) {
+            DDRF <<= 1;
+            DDRF |= mask>>i & 1;
+        }
+}
+
+void port2_write(uint8_t data) {
+        // same pins but reverse order
+        PORTF = 0;
+        for (uint8_t i = 0; i < 8; i++) {
+            PORTF <<= 1;
+            PORTF |= data>>i & 1;
+        }
+}
+
+void init_ports(void) {
+        port0_init(0xFF); // right LEDs.
+        port1_init(0x0F); // keys. lower half is the selector (write); upper is used to read that set (read)
+        port2_init(0xFF); // left LEDs.
+        DIDR0 = 0x00;
+        DIDR1 = 0x00;
 }
 
 void set_selector(uint8_t selector) {
-
-	/* selector:
-	   original:
-	   P1 lower 4 bits, 0,1,2,3
-	   pins 1,2,3,4
-	   
-	   teensy:
-	   PE0, PB7, PD0, PD1
-	*/
-        PORTE = (PORTE & ~(1<<0)) | (!!(selector & 1<<0) << 0);
-        PORTB = (PORTB & ~(1<<7)) | (!!(selector & 1<<1) << 7);
-        PORTD = (PORTD & ~(1<<0)) | (!!(selector & 1<<2) << 0);
-        PORTD = (PORTD & ~(1<<1)) | (!!(selector & 1<<3) << 1);
+        port1_write(selector & 0x0F);
 }
 
 uint8_t read_keys(void) {
-	/* key:
-	   original:
-	   P1 upper 4 bits, 4,5,6,7
-	   pins 5,6,7,8
-	   teensy:
-	   PD2,PD3,PD4,PD5
-	*/
-
-	// read port D pins 2 to 5
-	return PIND>>2 & 0x0F;
+        return port1_read() >> 4;
 }
 
 uint8_t scan_line(uint8_t selector) {
@@ -107,31 +158,8 @@ uint8_t scan_line(uint8_t selector) {
 }
 
 void set_led(uint8_t led) {
-
-	/*
-	  nas: p0 0e
-	  fun p0 0b
-	  norm p0 0d
-	  game mode p0 07
-
-	  DB 00h	;00h not used
-	  DB 0Dh	;01h normal mode   1101
-	  DB 0Eh	;02h NAS mode      1110
-	  DB 0Bh	;03h Function mode 1011
-
-	*/
-
-        // the below remaps the led bits into the order the pins appear on the bus
-
-        PORTB = 0;
-        // the 7 least signifigant bits are on PB0-6 but need to be reversed
-        for (uint8_t i = 0; i < 7; i++) {
-            PORTB <<= 1;
-            PORTB |= led>>i & 1;
-        }
-
-        // the most significant bit is on PE7
-        PORTE |= !!(led&(1<<7)) << 7;
+        port0_write(led);
+        port2_write(0x00);
 }
 
 uint8_t process_keys(void) {
@@ -187,13 +215,13 @@ uint8_t process_keys(void) {
 	// set mode LEDs
 	switch(mode) {
 	case MODE_NORMAL:
-		set_led(LED_NORM);
+		set_led(~LED_NORM);
 		break;
 	case MODE_NAS:
-		set_led(LED_NAS);
+		set_led(~LED_NAS);
 		break;
 	case MODE_FN:
-		set_led(LED_FN);
+		set_led(~LED_FN);
 		break;
 	}
 
@@ -293,7 +321,7 @@ int main(void)
 	usb_init();
 	while (!usb_configured()) /* wait */ ;
 
-	set_led(0xFD); // normal
+	set_led(~LED_NORM);
 
 	// Wait an extra second for the PC's operating system to load drivers
 	// and do whatever it does to actually be ready for input
