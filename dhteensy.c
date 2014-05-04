@@ -59,81 +59,133 @@ uint8_t mode_track_last_n=0;
 
 void reload(void);
 
-void port0_init(uint8_t mask) {
-        DDRB = (DDRB & ~(1<<6)) | (!!(mask & 1<<0) << 6);
-        DDRB = (DDRB & ~(1<<5)) | (!!(mask & 1<<1) << 5);
-        DDRB = (DDRB & ~(1<<4)) | (!!(mask & 1<<2) << 4);
-        DDRB = (DDRB & ~(1<<3)) | (!!(mask & 1<<3) << 3);
-        DDRB = (DDRB & ~(1<<2)) | (!!(mask & 1<<4) << 2);
-        DDRB = (DDRB & ~(1<<1)) | (!!(mask & 1<<5) << 1);
-        DDRB = (DDRB & ~(1<<0)) | (!!(mask & 1<<6) << 0);
-        DDRE = (DDRE & ~(1<<7)) | (!!(mask & 1<<7) << 7);
-}
+#define REMAP_PINS( \
+                   as, ai, ad, \
+                   bs, bi, bd, \
+                   cs, ci, cd, \
+                   ds, di, dd, \
+                   es, ei, ed, \
+                   fs, fi, fd, \
+                   gs, gi, gd, \
+                   hs, hi, hd )\
+            ad = (ad & ~(1<<ai)) | (!!(as & 1<<0) << ai); \
+            bd = (bd & ~(1<<bi)) | (!!(bs & 1<<1) << bi); \
+            cd = (cd & ~(1<<ci)) | (!!(cs & 1<<2) << ci); \
+            dd = (dd & ~(1<<di)) | (!!(ds & 1<<3) << di); \
+            ed = (ed & ~(1<<ei)) | (!!(es & 1<<4) << ei); \
+            fd = (fd & ~(1<<fi)) | (!!(fs & 1<<5) << fi); \
+            gd = (gd & ~(1<<gi)) | (!!(gs & 1<<6) << gi); \
+            hd = (hd & ~(1<<hi)) | (!!(hs & 1<<7) << hi);
+#define REMAP_PINS_INV( \
+                   as, ai, ad, \
+                   bs, bi, bd, \
+                   cs, ci, cd, \
+                   ds, di, dd, \
+                   es, ei, ed, \
+                   fs, fi, fd, \
+                   gs, gi, gd, \
+                   hs, hi, hd )\
+            ad = (ad & ~(1<<0)) | (!!(as & 1<<ai) << 0); \
+            bd = (bd & ~(1<<1)) | (!!(bs & 1<<bi) << 1); \
+            cd = (cd & ~(1<<2)) | (!!(cs & 1<<ci) << 2); \
+            dd = (dd & ~(1<<3)) | (!!(ds & 1<<di) << 3); \
+            ed = (ed & ~(1<<4)) | (!!(es & 1<<ei) << 4); \
+            fd = (fd & ~(1<<5)) | (!!(fs & 1<<fi) << 5); \
+            gd = (gd & ~(1<<6)) | (!!(gs & 1<<gi) << 6); \
+            hd = (hd & ~(1<<7)) | (!!(hs & 1<<hi) << 7);
 
-void port0_write(uint8_t data) {
-        PORTB = (PORTB & ~(1<<6)) | (!!(data & 1<<0) << 6);
-        PORTB = (PORTB & ~(1<<5)) | (!!(data & 1<<1) << 5);
-        PORTB = (PORTB & ~(1<<4)) | (!!(data & 1<<2) << 4);
-        PORTB = (PORTB & ~(1<<3)) | (!!(data & 1<<3) << 3);
-        PORTB = (PORTB & ~(1<<2)) | (!!(data & 1<<4) << 2);
-        PORTB = (PORTB & ~(1<<1)) | (!!(data & 1<<5) << 1);
-        PORTB = (PORTB & ~(1<<0)) | (!!(data & 1<<6) << 0);
-        PORTE = (PORTE & ~(1<<7)) | (!!(data & 1<<7) << 7);
-}
+void port0_init(uint8_t src) {
+    REMAP_PINS(
+        src, 6, DDRB
+      , src, 5, DDRB
+      , src, 4, DDRB
+      , src, 3, DDRB
+      , src, 2, DDRB
+      , src, 1, DDRB
+      , src, 0, DDRB
+      , src, 7, DDRE
+      )
+  }
 
-void port1_init(uint8_t mask) {
-        // PE0, PB7, PD0-6
-        DDRE = (DDRE & ~(1<<0)) | (!!(mask & 1<<0) << 0);
-        DDRB = (DDRB & ~(1<<7)) | (!!(mask & 1<<1) << 7);
-        DDRD = (DDRD & ~(1<<0)) | (!!(mask & 1<<2) << 0);
-        DDRD = (DDRD & ~(1<<1)) | (!!(mask & 1<<3) << 1);
-        DDRD = (DDRD & ~(1<<2)) | (!!(mask & 1<<4) << 2);
-        DDRD = (DDRD & ~(1<<3)) | (!!(mask & 1<<5) << 3);
-        DDRD = (DDRD & ~(1<<4)) | (!!(mask & 1<<6) << 4);
-        DDRD = (DDRD & ~(1<<5)) | (!!(mask & 1<<7) << 5);
-}
+void port0_write(uint8_t src) {
+    REMAP_PINS(
+        src, 6, PORTB
+      , src, 5, PORTB
+      , src, 4, PORTB
+      , src, 3, PORTB
+      , src, 2, PORTB
+      , src, 1, PORTB
+      , src, 0, PORTB
+      , src, 7, PORTE
+      )
+  }
 
-void port1_write(uint8_t data) {
-        PORTE = (PORTE & ~(1<<0)) | (!!(data & 1<<0) << 0);
-        PORTB = (PORTB & ~(1<<7)) | (!!(data & 1<<1) << 7);
-        PORTD = (PORTD & ~(1<<0)) | (!!(data & 1<<2) << 0);
-        PORTD = (PORTD & ~(1<<1)) | (!!(data & 1<<3) << 1);
-        PORTD = (PORTD & ~(1<<2)) | (!!(data & 1<<4) << 2);
-        PORTD = (PORTD & ~(1<<3)) | (!!(data & 1<<5) << 3);
-        PORTD = (PORTD & ~(1<<4)) | (!!(data & 1<<6) << 4);
-        PORTD = (PORTD & ~(1<<5)) | (!!(data & 1<<7) << 5);
-}
+void port1_init(uint8_t src) {
+    REMAP_PINS(
+        src, 0, DDRE
+      , src, 7, DDRB
+      , src, 0, DDRD
+      , src, 1, DDRD
+      , src, 2, DDRD
+      , src, 3, DDRD
+      , src, 4, DDRD
+      , src, 5, DDRD
+      )
+  }
+
+void port1_write(uint8_t src) {
+    REMAP_PINS(
+        src, 0, PORTE
+      , src, 7, PORTB
+      , src, 0, PORTD
+      , src, 1, PORTD
+      , src, 2, PORTD
+      , src, 3, PORTD
+      , src, 4, PORTD
+      , src, 5, PORTD
+      )
+  }
 
 uint8_t port1_read(void) {
-        uint8_t acc = 0;
-        acc |= !!(PIND & 1<<5); acc <<= 1;
-        acc |= !!(PIND & 1<<4); acc <<= 1;
-        acc |= !!(PIND & 1<<3); acc <<= 1;
-        acc |= !!(PIND & 1<<2); acc <<= 1;
-        acc |= !!(PIND & 1<<1); acc <<= 1;
-        acc |= !!(PIND & 1<<0); acc <<= 1;
-        acc |= !!(PINB & 1<<7); acc <<= 1;
-        acc |= !!(PINE & 1<<0);
-        return acc;
+    uint8_t acc = 0;
+    REMAP_PINS_INV(
+        PINE, 0, acc
+      , PINB, 7, acc
+      , PIND, 0, acc
+      , PIND, 1, acc
+      , PIND, 2, acc
+      , PIND, 3, acc
+      , PIND, 4, acc
+      , PIND, 5, acc
+      )
+    return acc;
 }
 
-void port2_init(uint8_t mask) {
-        // same pins but reverse order
-        DDRF = 0;
-        for (uint8_t i = 0; i < 8; i++) {
-            DDRF <<= 1;
-            DDRF |= mask>>i & 1;
-        }
-}
+void port2_init(uint8_t src) {
+    REMAP_PINS(
+        src, 7, DDRF
+      , src, 6, DDRF
+      , src, 5, DDRF
+      , src, 4, DDRF
+      , src, 3, DDRF
+      , src, 2, DDRF
+      , src, 1, DDRF
+      , src, 0, DDRF
+      )
+  }
 
-void port2_write(uint8_t data) {
-        // same pins but reverse order
-        PORTF = 0;
-        for (uint8_t i = 0; i < 8; i++) {
-            PORTF <<= 1;
-            PORTF |= data>>i & 1;
-        }
-}
+void port2_write(uint8_t src) {
+    REMAP_PINS(
+        src, 7, PORTF
+      , src, 6, PORTF
+      , src, 5, PORTF
+      , src, 4, PORTF
+      , src, 3, PORTF
+      , src, 2, PORTF
+      , src, 1, PORTF
+      , src, 0, PORTF
+      )
+  }
 
 void init_ports(void) {
         port0_init(0xFF); // right LEDs.
