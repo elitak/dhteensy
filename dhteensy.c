@@ -27,7 +27,7 @@
 #define LED_NORM 0x02
 #define LED_FN   0x04
 #define LED_10K  0x08
-#define LED_SCROLL 0x10 //FIXME when this bit is unset, none of the left side works. something fishy here...
+#define LED_SCROLL 0x10
 #define LED_NUM 0x20
 #define LED_MOUSE 0x40
 #define LED_CAPS 0x80
