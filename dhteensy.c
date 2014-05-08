@@ -27,6 +27,10 @@
 #define LED_NORM 0x02
 #define LED_FN   0x04
 #define LED_10K  0x08
+#define LED_SCROLL 0x10 //FIXME when this bit is unset, none of the left side works. something fishy here...
+#define LED_NUM 0x20
+#define LED_MOUSE 0x40
+#define LED_CAPS 0x80
 
 #include <avr/io.h>
 #include <avr/pgmspace.h>
@@ -188,11 +192,9 @@ void port2_write(uint8_t src) {
   }
 
 void init_ports(void) {
-        port0_init(0xFF); // right LEDs.
+        port0_init(0x0F); // right LEDs.
         port1_init(0x0F); // keys. lower half is the selector (write); upper is used to read that set (read)
-        port2_init(0xFF); // left LEDs.
-        DIDR0 = 0x00;
-        DIDR1 = 0x00;
+        port2_init(0x0F); // left LEDs.
 }
 
 void set_selector(uint8_t selector) {
@@ -210,8 +212,12 @@ uint8_t scan_line(uint8_t selector) {
 }
 
 void set_led(uint8_t led) {
-        port0_write(led);
-        port2_write(0x00);
+        // keyboard_leds is state pulled from the host, not maintained by us in this file.
+        led |= keyboard_leds & 0x02 ? LED_CAPS : 0; // TODO ENUM these flags in usb_keyboard_debug.c
+        led |= keyboard_leds & 0x01 ? LED_NUM : 0;
+        led |= keyboard_leds & 0x04 ? LED_SCROLL : 0;
+        port0_write(~(led & 0x0F));
+        port2_write(~(led>>4 & 0x0F));
 }
 
 uint8_t process_keys(void) {
@@ -267,13 +273,13 @@ uint8_t process_keys(void) {
 	// set mode LEDs
 	switch(mode) {
 	case MODE_NORMAL:
-		set_led(~LED_NORM);
+		set_led(LED_NORM);
 		break;
 	case MODE_NAS:
-		set_led(~LED_NAS);
+		set_led(LED_NAS);
 		break;
 	case MODE_FN:
-		set_led(~LED_FN);
+		set_led(LED_FN);
 		break;
 	}
 
@@ -373,7 +379,7 @@ int main(void)
 	usb_init();
 	while (!usb_configured()) /* wait */ ;
 
-	set_led(~LED_NORM);
+	set_led(LED_NORM);
 
 	// Wait an extra second for the PC's operating system to load drivers
 	// and do whatever it does to actually be ready for input
