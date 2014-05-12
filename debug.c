@@ -10,7 +10,7 @@ void debug_print(char *string) {
     uint8_t table[] = {
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x28, 0x00, 0x00, 0x00, 0x00, 0x00, 
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-        0x2C, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+        0x2C, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
 
         // +0x40
         0x27, 0x1E, 0x1F, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x00, 0x33, 0x00, 0x00, 0x00, 
@@ -28,30 +28,35 @@ void debug_print(char *string) {
         keyboard_modifier_keys = 0;
         if (b >= 'A' && b <= 'Z') {
             mod |= KEY_SHIFT;
+        // HACK ill need to keep a list of all shifted positions?? seems tedious. how does usb send special chars?
+        } else if (b == 0x23) { //hash
+            mod = KEY_SHIFT;
         }
         usb_keyboard_press(table[b], mod);
     }
 }
 
+#define BUFLEN 128
+
 void debug_dump(void) {
     uint8_t b;
-    char s[128];
+    char s[BUFLEN];
 
-    snprintf(s, 128, "port1 (keys) is\n"); debug_print(s);
+    snprintf(s, BUFLEN, "#port1 (keys) is\n"); debug_print(s);
     for (int selector=0; selector<14; selector++) {
         b = scan_line(selector);
-        snprintf(s, 128, "0x%.1x\n", b); debug_print(s);
+        snprintf(s, BUFLEN, "#  0x%.1x\n", b); debug_print(s);
     }
 
     b = port0_read();
-    snprintf(s, 128, "port0 is 0x%.2x\n", b); debug_print(s);
+    snprintf(s, BUFLEN, "#port0 is 0x%.2x\n", b); debug_print(s);
 
     b = port2_read();
-    snprintf(s, 128, "port2 is 0x%.2x\n", b); debug_print(s);
+    snprintf(s, BUFLEN, "#port2 is 0x%.2x\n", b); debug_print(s);
 
 
-    snprintf(s, 128, "pinE1 is 0b%d\n", !!(PINE & 1<<1)); debug_print(s);
-    snprintf(s, 128, "pinE6 is 0b%d\n", !!(PINE & 1<<6)); debug_print(s);
-    snprintf(s, 128, "pinC is 0x%.2x\n", PINC); debug_print(s);
-    snprintf(s, 128, "pinD6 is 0b%d\n", rst_read()); debug_print(s);
+    snprintf(s, BUFLEN, "#pinE1 is 0b%d\n", !!(PINE & 1<<1)); debug_print(s);
+    snprintf(s, BUFLEN, "#pinE6 is 0b%d\n", !!(PINE & 1<<6)); debug_print(s);
+    snprintf(s, BUFLEN, "#pinC is 0x%.2x\n", PINC); debug_print(s);
+    snprintf(s, BUFLEN, "#pinD6 is 0b%d\n", rst_read()); debug_print(s);
 }
