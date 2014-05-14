@@ -44,7 +44,11 @@ uint8_t port0_read(void) {
 
 void port1_init(uint8_t src) {
     REMAP_PINS(
+    #ifdef ALT_PINS_1
+        src, 5, DDRE
+    #else
         src, 0, DDRE
+    #endif
       , src, 7, DDRB
       , src, 0, DDRD
       , src, 1, DDRD
@@ -57,7 +61,11 @@ void port1_init(uint8_t src) {
 
 void port1_write(uint8_t src) {
     REMAP_PINS(
+    #ifdef ALT_PINS_1
+        src, 5, PORTE
+    #else
         src, 0, PORTE
+    #endif
       , src, 7, PORTB
       , src, 0, PORTD
       , src, 1, PORTD
@@ -71,7 +79,11 @@ void port1_write(uint8_t src) {
 uint8_t port1_read(void) {
     uint8_t acc = 0;
     REMAP_PINS_INV(
+    #ifdef ALT_PINS_1
+        PINE, 5, acc
+    #else
         PINE, 0, acc
+    #endif
       , PINB, 7, acc
       , PIND, 0, acc
       , PIND, 1, acc
