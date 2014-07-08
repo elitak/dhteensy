@@ -140,25 +140,25 @@ CPPDEFS = -DF_CPU=$(F_CPU)UL
 #  -Wall...:     warning level
 #  -Wa,...:      tell GCC to pass this to the assembler.
 #    -adhlns...: create assembler listing
-CFLAGS = -g$(DEBUG)
-CFLAGS += $(CDEFS)
-CFLAGS += -O$(OPT)
-CFLAGS += -funsigned-char
-CFLAGS += -funsigned-bitfields
-CFLAGS += -ffunction-sections
-CFLAGS += -fpack-struct
-CFLAGS += -fshort-enums
-CFLAGS += -Wall
-CFLAGS += -Werror
-CFLAGS += -Wstrict-prototypes
-#CFLAGS += -mshort-calls
-#CFLAGS += -fno-unit-at-a-time
-#CFLAGS += -Wundef
-#CFLAGS += -Wunreachable-code
-#CFLAGS += -Wsign-compare
-CFLAGS += -Wa,-adhlns=$(<:%.c=$(OBJDIR)/%.lst)
-CFLAGS += $(patsubst %,-I%,$(EXTRAINCDIRS))
-CFLAGS += $(CSTANDARD)
+override CFLAGS += -g$(DEBUG)
+override CFLAGS += $(CDEFS)
+override CFLAGS += -O$(OPT)
+override CFLAGS += -funsigned-char
+override CFLAGS += -funsigned-bitfields
+override CFLAGS += -ffunction-sections
+override CFLAGS += -fpack-struct
+override CFLAGS += -fshort-enums
+override CFLAGS += -Wall
+override CFLAGS += -Werror
+override CFLAGS += -Wstrict-prototypes
+#override CFLAGS += -mshort-calls
+#override CFLAGS += -fno-unit-at-a-time
+#override CFLAGS += -Wundef
+#override CFLAGS += -Wunreachable-code
+#override CFLAGS += -Wsign-compare
+override CFLAGS += -Wa,-adhlns=$(<:%.c=$(OBJDIR)/%.lst)
+override CFLAGS += $(patsubst %,-I%,$(EXTRAINCDIRS))
+override CFLAGS += $(CSTANDARD)
 
 
 #---------------- Compiler Options C++ ----------------
