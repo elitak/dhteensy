@@ -61,15 +61,18 @@ void set_led(uint8_t led) {
 }
 
 // TODO
-// toggle mode in levers
-// winkey off of lever
-// naslock
-// mouse mode
-// reset button hardwired to teensy if possible:
-//    have 1 key dump wire states to see if its in the selector operated pins or a separate dedicated pin.
-//    test to see if the teensy can reset itself by writing 0 to a pin connected to the reset
-//    look into two reset modes (to program vs. restart code)
-//    once thats all done maybe code in different uses for ther eset button based on press length and also use leds as feedback
+// * toggle mode in levers
+// * winkey off of lever
+// * naslock key should go to 10k while pressed (right now does nothing). Give consideration to hexadecimal in that mode.
+// * capslock should be moved away and that key used as another metakey
+// * rework NAS layer? right now typing eg (''),; is way too hard
+// * better abstract "autoshifting". |0x80 is messy and just wrong since it conflates the US layout with USB key codes
+// * mouse mode
+// * reset button hardwired to teensy if possible:
+//    - have 1 key dump wire states to see if its in the selector operated pins or a separate dedicated pin.
+//    - test to see if the teensy can reset itself by writing 0 to a pin connected to the reset
+//    - look into two reset modes (to program vs. restart code)
+//    - once thats all done maybe code in different uses for ther eset button based on press length and also use leds as feedback
 
 
 uint8_t process_keys(void) {
