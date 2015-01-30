@@ -66,14 +66,11 @@ void set_led(uint8_t led) {
 // * naslock key should go to 10k while pressed (right now does nothing). Give consideration to hexadecimal in that mode.
 // * capslock should be moved away and that key used as another metakey
 // * rework NAS layer? right now typing eg (''),; is way too hard
-// * better abstract "autoshifting". |0x80 is messy and just wrong since it conflates the US layout with USB key codes
 // * mouse mode
-// * reset button hardwired to teensy if possible:
-//    - have 1 key dump wire states to see if its in the selector operated pins or a separate dedicated pin.
+// * reset button:
 //    - test to see if the teensy can reset itself by writing 0 to a pin connected to the reset
-//    - look into two reset modes (to program vs. restart code)
-//    - once thats all done maybe code in different uses for ther eset button based on press length and also use leds as feedback
-
+//    - look into two reset modes (to program vs. restart code), using the external button to program would be nice.
+//    - once thats all done maybe code in different uses for the reset button based on press length and also use leds as feedback
 
 uint8_t process_keys(void) {
 
@@ -84,21 +81,20 @@ uint8_t process_keys(void) {
     int8_t no_auto_shift=0;
     uint8_t mode=MODE_NORMAL;
     uint8_t kmode;
-    int sum=0;
+    uint32_t sum = 0;
     uint8_t mode_track_n=0;
     uint8_t mode_track[MODE_TRACK_MAX];
 
 
     // first pass for special keys
-    for (i=0; i<keys_down_n; i++) {
-        k = keys_down[i];
-        keycode=pgm_read_byte(normal_keys+k);
+    for (i=0; i<keys_down_n; i++) { // go through each key that's currently depressed
+        k = keys_down[i]; // k is thi index into our keymapping table
+        keycode=pgm_read_byte(normal_keys+k); // lookup the keycode in our keymapping table
 
-        // this is an ugly hack to avoid sending new events if
-        // the only thing that has changed is the FN or NAS state
-
-        if (keycode != KEY_DH_FN && keycode != KEY_DH_NAS)
-            sum += keycode;
+        // this (along with conditional later) is an ugly hack to avoid sending
+        // new events if the only thing that has changed is the FN or NAS state
+        sum |= keycode == KEY_DH_FN || keycode == KEY_DH_NAS ? 0x80000000 : 0; // XXX represent these inconsequential key (de)presses as the highest bit, for sake of state equivalency checking after this first pass (the 'f12 bug' fix)
+        sum += keycode;
 
         switch(keycode) {
             case KEY_DH_NAS:
@@ -137,7 +133,7 @@ uint8_t process_keys(void) {
 
     if (sum == lastsum) // return if nothing has changed
         return 0;
-    lastsum=sum;
+    lastsum = sum;
 
     // second pass for the rest
 
