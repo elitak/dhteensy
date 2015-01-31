@@ -74,7 +74,8 @@ void set_led(uint8_t led) {
 
 uint8_t process_keys(void) {
 
-    uint8_t k, i, keycode=0,nkeys=0;
+    uint8_t k, i, nkeys=0;
+    uint16_t keycode;
     uint8_t dh_keyboard_modifier_keys=0;
     uint8_t dh_keyboard_keys[6]={0,0,0,0,0,0};
     int8_t auto_shift=0;
@@ -89,7 +90,7 @@ uint8_t process_keys(void) {
     // first pass for special keys
     for (i=0; i<keys_down_n; i++) { // go through each key that's currently depressed
         k = keys_down[i]; // k is thi index into our keymapping table
-        keycode=pgm_read_byte(normal_keys+k); // lookup the keycode in our keymapping table
+        keycode=pgm_read_word(normal_keys+k); // lookup the keycode in our keymapping table
 
         // this (along with conditional later) is an ugly hack to avoid sending
         // new events if the only thing that has changed is the FN or NAS state
@@ -152,27 +153,27 @@ uint8_t process_keys(void) {
 
         switch(kmode) {
             case MODE_NORMAL:
-                keycode = pgm_read_byte(normal_keys+k);
+                keycode = pgm_read_word(normal_keys+k);
                 break;
             case MODE_NAS:
-                keycode = pgm_read_byte(nas_keys+k);
+                keycode = pgm_read_word(nas_keys+k);
                 break;
             case MODE_FN:
-                keycode = pgm_read_byte(fn_keys+k);
+                keycode = pgm_read_word(fn_keys+k);
                 break;
         }
 
 
-        if (keycode>=0xF0) continue; // special, already handled
+        if (keycode & 0x80) continue; // f0-ff are special, already handled
 
-        // high bit set means shifted
+        // ninth LSBit of 16-bit keycode means "shifted"
         // keep a count of auto-shifted vs unshifted keys
-        if ((keycode & (1<<7)))
+        if (keycode & 1<<8)
             auto_shift++;
         else
             no_auto_shift++;
 
-        keycode &= 0x7f; // zero high bit
+        keycode &= 0xff; // mask to single byte
 
         if(nkeys>5) break;
         dh_keyboard_keys[nkeys]=keycode;
@@ -200,6 +201,13 @@ uint8_t process_keys(void) {
 }
 
 uint8_t key_down(uint8_t key) {
+        // XXX TODO this exhibits weird (corner case) behavior. e.g., can't
+        // repeate shifted+unshifted chars while both pressed. this is not
+        // really an issue as the repeating is somewhat non standard to begin
+        // with, like who wants 'htns' repeated in that sequence??? this
+        // behavior only triggers when all keys are pressed during the same
+        // 10ms window, and reorders the keypreses into the order they were
+        // scanned... what do 'normal' keyboards even do in these cases?
 	if(keys_down_n>=15) 
 		return -1;
 	keys_down[keys_down_n]=key;
