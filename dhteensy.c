@@ -74,7 +74,7 @@ void set_led(uint8_t led) {
 
 uint8_t process_keys(void) {
 
-    uint8_t k, i, nkeys=0;
+    uint8_t k, i, nkeys=0, on_shifted_layer;
     uint16_t keycode;
     uint8_t dh_keyboard_modifier_keys=0;
     uint8_t dh_keyboard_keys[6]={0,0,0,0,0,0};
@@ -137,9 +137,9 @@ uint8_t process_keys(void) {
     lastsum = sum;
 
     // second pass for the rest
-
     for (i=0; i<keys_down_n; i++) {
         keycode=0;
+        on_shifted_layer=0;
         k=keys_down[i];
 
         kmode=mode;
@@ -153,13 +153,16 @@ uint8_t process_keys(void) {
 
         switch(kmode) {
             case MODE_NORMAL:
-                keycode = pgm_read_word(normal_keys+k);
+                if (dh_keyboard_modifier_keys & KEY_SHIFT) keycode = pgm_read_word(normalS_keys+k);
+                if (!keycode) keycode = pgm_read_word(normal_keys+k); else on_shifted_layer = 1;
                 break;
             case MODE_NAS:
-                keycode = pgm_read_word(nas_keys+k);
+                if (dh_keyboard_modifier_keys & KEY_SHIFT) keycode = pgm_read_word(nasS_keys+k);
+                if (!keycode) keycode = pgm_read_word(nas_keys+k); else on_shifted_layer = 1;
                 break;
             case MODE_FN:
-                keycode = pgm_read_word(fn_keys+k);
+                if (dh_keyboard_modifier_keys & KEY_SHIFT) keycode = pgm_read_word(fnS_keys+k);
+                if (!keycode) keycode = pgm_read_word(fn_keys+k); else on_shifted_layer = 1;
                 break;
         }
 
@@ -170,7 +173,8 @@ uint8_t process_keys(void) {
         // keep a count of auto-shifted vs unshifted keys
         if (keycode & 1<<8)
             auto_shift++;
-        else
+        else if (on_shifted_layer)
+            // only count unshifted that are pressed on shifted layers
             no_auto_shift++;
 
         keycode &= 0xff; // mask to single byte
@@ -178,21 +182,26 @@ uint8_t process_keys(void) {
         if(nkeys>5) break;
         dh_keyboard_keys[nkeys]=keycode;
         nkeys++;
-    }
+    } // end second pass
 
     for (i=0;i<mode_track_n;i++) {
         mode_track_last[i]=mode_track[i];
     }
     mode_track_last_n = mode_track_n;
 
-    // we have some auto-shift keys down
-    if (auto_shift>0) {
+    if (no_auto_shift>0 && dh_keyboard_modifier_keys & KEY_SHIFT) {
         // don't update if we have both auto-shift and non-auto-shift keys
-        if (no_auto_shift>0)
-            return 0; 
+        if (auto_shift>0) return 0; 
+        // if we pressed a shifted key from a shifted layer, don't include the shift modifier itself.
+        dh_keyboard_modifier_keys ^= KEY_SHIFT;
+    // we have some auto-shift keys down
+    } else if (auto_shift>0) {
+        // don't update if we have both auto-shift and non-auto-shift keys
+        if (no_auto_shift>0) return 0; 
         dh_keyboard_modifier_keys |= KEY_SHIFT;
     }
 
+    // setup the 2 global vars used by usb_keyboard_send(); XXX i dont see any reason why they can't be on the stack.
     for (i=0; i<6; i++) {
         keyboard_keys[i]=dh_keyboard_keys[i];
     }
