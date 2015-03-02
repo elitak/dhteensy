@@ -134,28 +134,23 @@ int get_discounted(uint8_t *keys_down, uint8_t keys_down_n) {
 uint8_t process_keys(uint8_t *keys_down, uint8_t keys_down_n) {
     uint8_t keyid, i, nkeys=0, is_shifted;
     uint16_t keycode;
-    uint8_t dh_keyboard_modifier_keys=0;
     uint8_t dh_keyboard_keys[6]={0,0,0,0,0,0};
     int8_t auto_shift=0;
     int8_t no_auto_shift=0;
-    uint8_t mode;
     uint8_t kmode;
     uint8_t mode_track_n = 0;
     uint16_t mode_track[MODE_TRACK_MAX];
     uint8_t something_new = 0;
     static uint16_t key_track[KEYS_DOWN_MAX];
-    static uint8_t num_down = 0;
+    static uint8_t num_down_last = 0;
     static uint16_t mode_track_last[MODE_TRACK_MAX];
     static uint8_t mode_track_last_n = 0;
+    uint8_t discounted = get_discounted(keys_down, keys_down_n);
+    uint8_t dh_keyboard_modifier_keys = get_modifiers(keys_down, keys_down_n);
+    uint8_t mode = get_modes(keys_down, keys_down_n);
 
     // canonicalize the list of keys down by sorting it
     qsort(keys_down, keys_down_n, sizeof(uint8_t), compare);
-    // FIXME weird bug here typing 'status' quickly omits second t, reversing this ordering fixes
-    // nana
-    // nono
-
-    mode = get_modes(keys_down, keys_down_n);
-    dh_keyboard_modifier_keys = get_modifiers(keys_down, keys_down_n);
 
     // Always at least set the mode-LEDs
     if (mode & MODE_FN) {
@@ -167,12 +162,14 @@ uint8_t process_keys(uint8_t *keys_down, uint8_t keys_down_n) {
     }
 
     for (i=0; i<keys_down_n; i++) {
-        if (keys_down[i] != key_track[i] || num_down != keys_down_n)
-                something_new = 1;
+        if (keys_down[i] != key_track[i]) something_new = 1;
         key_track[i] = keys_down[i];
     }
 
-    if (keys_down_n == get_discounted(keys_down, keys_down_n)) {
+    if (num_down_last != keys_down_n - discounted) something_new = 1;
+    num_down_last = keys_down_n - discounted;
+
+    if (keys_down_n == discounted) {
         //reset key tracker in case same key is pressed next time
         key_track[0] = 0xff;
     } else if (!something_new) {
