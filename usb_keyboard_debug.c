@@ -343,20 +343,24 @@ uint8_t usb_configured(void)
 int8_t usb_keyboard_press(uint8_t key, uint8_t modifier)
 {
 	int8_t r;
+        uint8_t keyboard_keys[6]={key,0,0,0,0,0};
 
-	keyboard_modifier_keys = modifier;
-	keyboard_keys[0] = key;
-	r = usb_keyboard_send();
+	r = usb_keyboard_send(keyboard_keys, modifier);
 	if (r) return r;
-	keyboard_modifier_keys = 0;
 	keyboard_keys[0] = 0;
-	return usb_keyboard_send();
+	return usb_keyboard_send(keyboard_keys, 0);
 }
 
 // send the contents of keyboard_keys and keyboard_modifier_keys
-int8_t usb_keyboard_send(void)
+int8_t usb_keyboard_send(uint8_t *keys, uint8_t mod)
 {
 	uint8_t i, intr_state, timeout;
+
+        // have to copy to globals because ISR interrupt handler uses these at some point
+	for (i=0; i<6; i++) {
+		keyboard_keys[i] = keys[i];
+	}
+        keyboard_modifier_keys = mod;
 
 	if (!usb_configuration) return -1;
 	intr_state = SREG;

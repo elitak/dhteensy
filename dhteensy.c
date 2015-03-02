@@ -38,13 +38,8 @@ uint8_t hex_keys[16]=
 
 uint16_t idle_count=0;
 
-// duplicated this so that we can safely change it without worrying about interrupts
 #define KEYS_DOWN_MAX 16
-uint8_t keys_down[KEYS_DOWN_MAX];
-uint8_t keys_down_n;
 #define MODE_TRACK_MAX 16
-uint16_t mode_track_last[MODE_TRACK_MAX];
-uint8_t mode_track_last_n=0;
 
 void init_ports(void) {
         port0_init(0x0F); // right LEDs.
@@ -64,8 +59,7 @@ void set_led(uint8_t led) {
 
 int compare (const void * a, const void * b)
 {
-    // HACK XXX negate to avoid 'git status' bug
-    return -( *(uint8_t*)a - *(uint8_t*)b );
+    return ( *(uint8_t*)a - *(uint8_t*)b );
 }
 
 int get_modes(uint8_t *keys_down, uint8_t keys_down_n) {
@@ -148,9 +142,11 @@ uint8_t process_keys(uint8_t *keys_down, uint8_t keys_down_n) {
     uint8_t kmode;
     uint8_t mode_track_n = 0;
     uint16_t mode_track[MODE_TRACK_MAX];
-    static uint16_t key_track[KEYS_DOWN_MAX];
     uint8_t something_new = 0;
-    uint8_t dont_count = 0;
+    static uint16_t key_track[KEYS_DOWN_MAX];
+    static uint8_t num_down = 0;
+    static uint16_t mode_track_last[MODE_TRACK_MAX];
+    static uint8_t mode_track_last_n = 0;
 
     // canonicalize the list of keys down by sorting it
     qsort(keys_down, keys_down_n, sizeof(uint8_t), compare);
@@ -160,7 +156,6 @@ uint8_t process_keys(uint8_t *keys_down, uint8_t keys_down_n) {
 
     mode = get_modes(keys_down, keys_down_n);
     dh_keyboard_modifier_keys = get_modifiers(keys_down, keys_down_n);
-    dont_count = get_discounted(keys_down, keys_down_n);
 
     // Always at least set the mode-LEDs
     if (mode & MODE_FN) {
@@ -172,12 +167,12 @@ uint8_t process_keys(uint8_t *keys_down, uint8_t keys_down_n) {
     }
 
     for (i=0; i<keys_down_n; i++) {
-        if (keys_down[i] != key_track[i])
-            something_new = 1;
+        if (keys_down[i] != key_track[i] || num_down != keys_down_n)
+                something_new = 1;
         key_track[i] = keys_down[i];
     }
 
-    if (keys_down_n - dont_count == 0) {
+    if (keys_down_n == get_discounted(keys_down, keys_down_n)) {
         //reset key tracker in case same key is pressed next time
         key_track[0] = 0xff;
     } else if (!something_new) {
@@ -230,10 +225,9 @@ uint8_t process_keys(uint8_t *keys_down, uint8_t keys_down_n) {
         nkeys++;
     } // end second pass
 
-    for (i=0;i<mode_track_n;i++) {
-        mode_track_last[i]=mode_track[i];
-    }
-    mode_track_last_n = mode_track_n;
+    for (int i = 0; i<MODE_TRACK_MAX; i++)
+        mode_track_last[i] = mode_track[i];
+
 
     if (no_auto_shift>0 && mode & MODE_SHIFTED) {
         if (auto_shift>0) return 0; 
@@ -245,15 +239,10 @@ uint8_t process_keys(uint8_t *keys_down, uint8_t keys_down_n) {
         dh_keyboard_modifier_keys |= KEY_SHIFT;
     }
 
-    // setup the 2 global vars used by usb_keyboard_send(); XXX i dont see any reason why they can't be on the stack.
-    for (i=0; i<6; i++) {
-        keyboard_keys[i]=dh_keyboard_keys[i];
-    }
-    keyboard_modifier_keys=dh_keyboard_modifier_keys;
-    return usb_keyboard_send();
+    return usb_keyboard_send(dh_keyboard_keys, dh_keyboard_modifier_keys);
 }
 
-uint8_t key_down(uint8_t key) {
+uint8_t key_down(uint8_t key, uint8_t *keys_down, uint8_t *keys_down_n) {
         // XXX TODO this exhibits weird (corner case) behavior. e.g., can't
         // repeat shifted+unshifted chars while both pressed. this is not
         // really an issue as the repeating is somewhat non standard to begin
@@ -261,16 +250,18 @@ uint8_t key_down(uint8_t key) {
         // behavior only triggers when all keys are pressed during the same
         // 10ms window, and reorders the keypreses into the order they were
         // scanned... what do 'normal' keyboards even do in these cases?
-	if(keys_down_n>=15) 
+	if(*keys_down_n>=15) 
 		return -1;
-	keys_down[keys_down_n]=key;
-	keys_down_n++;
+	keys_down[*keys_down_n] = key;
+	(*keys_down_n)++;
 	return 0;
 }
 
 int main(void)
 {
 	uint8_t i, b, selector;
+        uint8_t keys_down[KEYS_DOWN_MAX];
+        uint8_t keys_down_n;
 
 	// set for 16 MHz clock
 	CPU_PRESCALE(0);
@@ -291,9 +282,6 @@ int main(void)
 	// and do whatever it does to actually be ready for input
 	_delay_ms(1000);
 
-	for (i=0; i<MODE_TRACK_MAX; i++) {
-		mode_track_last[i]=0;
-	}
 	while (1) {
 		// zero out dh kbd buffer
 		for (i=0; i<16; i++) {
@@ -305,7 +293,7 @@ int main(void)
 			b=scan_line(selector);
 			for(i=0;i<4; i++) 
 				if(b & (1<<i))
-					key_down((selector << 2) +i);
+					key_down((selector << 2) +i, keys_down, &keys_down_n);
 		}
 		process_keys(keys_down, keys_down_n);
                 if (rst_read()) {debug_dump();}

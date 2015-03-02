@@ -25,7 +25,6 @@ void debug_print(char *string) {
     for (char *c = string; *c;) {
         uint8_t mod = 0;
         uint8_t b = *c++;
-        keyboard_modifier_keys = 0;
         if (b >= 'A' && b <= 'Z') {
             mod |= KEY_SHIFT;
         // HACK ill need to keep a list of all shifted positions?? seems tedious. how does usb send special chars?
