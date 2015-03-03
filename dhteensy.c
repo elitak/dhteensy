@@ -138,11 +138,11 @@ uint8_t process_keys(uint8_t *keys_down, uint8_t keys_down_n) {
     int8_t auto_shift=0;
     int8_t no_auto_shift=0;
     uint8_t kmode;
-    uint8_t mode_track_n = 0;
-    uint16_t mode_track[MODE_TRACK_MAX];
     uint8_t something_new = 0;
     static uint16_t key_track[KEYS_DOWN_MAX];
     static uint8_t num_down_last = 0;
+    uint16_t mode_track[MODE_TRACK_MAX];
+    uint8_t mode_track_n = 0;
     static uint16_t mode_track_last[MODE_TRACK_MAX];
     static uint8_t mode_track_last_n = 0;
     uint8_t discounted = get_discounted(keys_down, keys_down_n);
@@ -152,7 +152,7 @@ uint8_t process_keys(uint8_t *keys_down, uint8_t keys_down_n) {
     // canonicalize the list of keys down by sorting it
     qsort(keys_down, keys_down_n, sizeof(uint8_t), compare);
 
-    // Always at least set the mode-LEDs
+    // Always at least set the mode-LEDs, before returning
     if (mode & MODE_FN) {
         set_led(LED_FN);
     } else if (mode & MODE_NAS) {
@@ -161,30 +161,32 @@ uint8_t process_keys(uint8_t *keys_down, uint8_t keys_down_n) {
         set_led(LED_NORM);
     }
 
+    // Detect whether any actionable changes have occurred since previous invocation,
+    // and save the keydown state across the whole board.
     for (i=0; i<keys_down_n; i++) {
         if (keys_down[i] != key_track[i]) something_new = 1;
         key_track[i] = keys_down[i];
     }
-
     if (num_down_last != keys_down_n - discounted) something_new = 1;
     num_down_last = keys_down_n - discounted;
 
+    // Return early if no action needed.
     if (keys_down_n == discounted) {
         //reset key tracker in case same key is pressed next time
-        key_track[0] = 0xff;
+        key_track[0] = 0xff; // XXX 0xff is an unused keyid
     } else if (!something_new) {
         // return if nothing (besides maybe metakeys) has changed
         // and if no keys are down at all (in that case we need to unpress the last keys)
         return 0;
     }
 
-    // second pass for the rest
+    // Now actually process the keys that are down
     for (i=0; i<keys_down_n; i++) {
         keycode = 0;
         keyid = keys_down[i];
         is_shifted = 0;
 
-        kmode=mode; // the default mode of each key is what's currently depressed.
+        kmode = mode; // the default mode of each key is what's currently depressed.
         // Mode track records (modeflags)(keybyte) as short, in the order they get scanned.
         for (uint8_t j=0; j<mode_track_last_n; j++) {
             // Test each's lower byte for equality to see if only the mode changed.
@@ -192,7 +194,7 @@ uint8_t process_keys(uint8_t *keys_down, uint8_t keys_down_n) {
                 kmode = mode_track_last[j] >> 8; // if key was down previously use its original mode
             }
         }
-        mode_track[mode_track_n++] = (kmode << 8) + keyid; // record current mode
+        mode_track[mode_track_n++] = kmode << 8 | keyid; // record current mode
 
         if (kmode & MODE_FN) {
             if (kmode & MODE_SHIFTED) keycode = pgm_read_word(fnS_keys+keyid);
@@ -222,9 +224,10 @@ uint8_t process_keys(uint8_t *keys_down, uint8_t keys_down_n) {
         nkeys++;
     } // end second pass
 
+    // save mode state
     for (int i = 0; i<MODE_TRACK_MAX; i++)
         mode_track_last[i] = mode_track[i];
-
+    mode_track_last_n = mode_track_n;
 
     if (no_auto_shift>0 && mode & MODE_SHIFTED) {
         if (auto_shift>0) return 0; 
@@ -240,13 +243,17 @@ uint8_t process_keys(uint8_t *keys_down, uint8_t keys_down_n) {
 }
 
 uint8_t key_down(uint8_t key, uint8_t *keys_down, uint8_t *keys_down_n) {
-        // XXX TODO this exhibits weird (corner case) behavior. e.g., can't
-        // repeat shifted+unshifted chars while both pressed. this is not
-        // really an issue as the repeating is somewhat non standard to begin
-        // with, like who wants 'htns' repeated in that sequence??? this
-        // behavior only triggers when all keys are pressed during the same
-        // 10ms window, and reorders the keypreses into the order they were
-        // scanned... what do 'normal' keyboards even do in these cases?
+        // XXX TODO
+        // (I highly doubt this will ever be an issue even in GAMES, since most
+        // bindings use keys on the normal layer and reserve shift/ctrl/alt as
+        // raw metakeys)
+        // This exhibits weird (corner case) behavior. e.g., can't repeat
+        // shifted+unshifted chars while both pressed (e.g., {]). this is not
+        // really an issue as repeating groups of more than one character is
+        // unneeded, except maybe in GAMES This behavior only triggers when all
+        // keys are pressed during the same 10ms window anyway, and reorders
+        // the keypresses into the order they were scanned... what do 'normal'
+        // keyboards even do in these cases?
 	if(*keys_down_n>=15) 
 		return -1;
 	keys_down[*keys_down_n] = key;
