@@ -197,11 +197,15 @@ uint8_t process_keys(uint8_t *keys_down, uint8_t keys_down_n) {
         mode_track[mode_track_n++] = kmode << 8 | keyid; // record current mode
 
         if (kmode & MODE_FN) {
-            if (kmode & MODE_SHIFTED) keycode = pgm_read_word(fnS_keys+keyid);
-            if (!keycode) keycode = pgm_read_word(fn_keys+keyid); else is_shifted = 1;
+            // TODO restore this once fnS and nasS are actually populated with nulls.
+            // Also note that shift+left etc should highlight text
+            //if (kmode & MODE_SHIFTED) keycode = pgm_read_word(fnS_keys+keyid);
+            //if (!keycode) keycode = pgm_read_word(fn_keys+keyid); else is_shifted = 1;
+            keycode = pgm_read_word(fn_keys+keyid);
         } else if (kmode & MODE_NAS) {
-            if (kmode & MODE_SHIFTED) keycode = pgm_read_word(nasS_keys+keyid);
-            if (!keycode) keycode = pgm_read_word(nas_keys+keyid); else is_shifted = 1;
+            //if (kmode & MODE_SHIFTED) keycode = pgm_read_word(nasS_keys+keyid);
+            //if (!keycode) keycode = pgm_read_word(nas_keys+keyid); else is_shifted = 1;
+            keycode = pgm_read_word(nas_keys+keyid);
         } else {
             if (kmode & MODE_SHIFTED) keycode = pgm_read_word(normalS_keys+keyid);
             if (!keycode) keycode = pgm_read_word(normal_keys+keyid); else is_shifted = 1;
