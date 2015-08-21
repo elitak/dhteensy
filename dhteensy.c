@@ -29,6 +29,7 @@
 #define MODE_NAS 1
 #define MODE_FN 2
 #define MODE_SHIFTED 4
+#define MODES_SINGULAR (MODE_NORMAL | MODE_NAS | MODE_FN)
 
 #define CPU_PRESCALE(n)	(CLKPR = 0x80, CLKPR = (n))
 
@@ -70,9 +71,19 @@ int get_modes(uint8_t *keys_down, uint8_t keys_down_n) {
         uint16_t keycode = pgm_read_word(normal_keys + keyid); // lookup the keycode in the "normal" layer, since we're only interested in metakeys.
 
         // XXX really either NAS or FN can be active at one time (flags interpreted later)
-        if      (keycode == KEY_DH_NAS) { modes |= MODE_NAS; }
-        else if (keycode == KEY_DH_FN) { modes |= MODE_FN; }
-        else if (keycode == KEY_DH_SHIFT) { modes |= MODE_SHIFTED; }
+        switch (keycode) {
+            case KEY_DH_NAS:
+                modes |= MODE_NAS;
+                break;
+            case KEY_DH_FN:
+                modes |= MODE_FN;
+                break;
+        }
+        switch (keycode) {
+            case KEY_DH_SHIFT:
+                modes |= MODE_SHIFTED;
+                break;
+        }
 
     }
     return modes;
@@ -85,14 +96,21 @@ int get_modifiers(uint8_t *keys_down, uint8_t keys_down_n) {
         int keyid = keys_down[i];
         uint16_t keycode = pgm_read_word(normal_keys + keyid);
 
-        if (keycode == KEY_DH_SHIFT) { mods |= KEY_SHIFT; }
-        else if (keycode == KEY_DH_CTRL) { mods |= KEY_CTRL; }
-        else if (keycode == KEY_DH_ALT) { mods |= KEY_ALT; }
-        else if (keycode == 0xe3 //LeftGUI
-                 || keycode == 0xe7 //RightGUI
-                 //|| keycode == KEY_DH_NORM:
-                 ) {
-            mods |= KEY_GUI;
+        switch (keycode) {
+            case KEY_DH_SHIFT:
+                mods |= KEY_SHIFT;
+                break;
+            case KEY_DH_CTRL:
+                mods |= KEY_CTRL;
+                break;
+            case KEY_DH_ALT:
+                mods |= KEY_ALT;
+                break;
+            case 0xe3: //LeftGUI
+            case 0xe7: //RightGUI
+            //case KEY_DH_NORM:
+                mods |= KEY_GUI;
+                break;
         }
     }
     return mods;
@@ -121,7 +139,6 @@ int get_discounted(uint8_t *keys_down, uint8_t keys_down_n) {
 
 // TODO
 // * toggle mode in levers
-// * winkey off of lever
 // * naslock key should go to 10k while pressed (right now does nothing). Give consideration to hexadecimal in that mode.
 // * capslock should be moved away and that key used as another metakey
 // * rework NAS layer? right now typing eg (''),; is way too hard
@@ -132,11 +149,11 @@ int get_discounted(uint8_t *keys_down, uint8_t keys_down_n) {
 //    - once thats all done maybe code in different uses for the reset button based on press length and also use leds as feedback
 
 uint8_t process_keys(uint8_t *keys_down, uint8_t keys_down_n) {
-    uint8_t keyid, i, nkeys=0, is_shifted;
+    uint8_t keyid, i, j, nkeys=0, is_from_shifted_layer;
     uint16_t keycode;
     uint8_t dh_keyboard_keys[6]={0,0,0,0,0,0};
-    int8_t auto_shift=0;
-    int8_t no_auto_shift=0;
+    int8_t auto_shifted = 0;
+    int8_t non_auto_shifted = 0;
     uint8_t kmode;
     uint8_t something_new = 0;
     static uint16_t key_track[KEYS_DOWN_MAX];
@@ -148,17 +165,23 @@ uint8_t process_keys(uint8_t *keys_down, uint8_t keys_down_n) {
     uint8_t discounted = get_discounted(keys_down, keys_down_n);
     uint8_t dh_keyboard_modifier_keys = get_modifiers(keys_down, keys_down_n);
     uint8_t mode = get_modes(keys_down, keys_down_n);
+    const uint16_t *table, *tableS;
 
     // canonicalize the list of keys down by sorting it
     qsort(keys_down, keys_down_n, sizeof(uint8_t), compare);
 
     // Always at least set the mode-LEDs, before returning
-    if (mode & MODE_FN) {
-        set_led(LED_FN);
-    } else if (mode & MODE_NAS) {
-        set_led(LED_NAS);
-    } else {
-        set_led(LED_NORM);
+    switch (mode & MODES_SINGULAR) {
+        case MODE_FN:
+            set_led(LED_FN);
+            break;
+        case MODE_NAS:
+            set_led(LED_NAS);
+            break;
+        case MODE_NORMAL:
+        default:
+            set_led(LED_NORM);
+            break;
     }
 
     // Detect whether any actionable changes have occurred since previous invocation,
@@ -184,11 +207,11 @@ uint8_t process_keys(uint8_t *keys_down, uint8_t keys_down_n) {
     for (i=0; i<keys_down_n; i++) {
         keycode = 0;
         keyid = keys_down[i];
-        is_shifted = 0;
+        is_from_shifted_layer = 0;
 
         kmode = mode; // the default mode of each key is what's currently depressed.
         // Mode track records (modeflags)(keybyte) as short, in the order they get scanned.
-        for (uint8_t j=0; j<mode_track_last_n; j++) {
+        for (j=0; j<mode_track_last_n; j++) {
             // Test each's lower byte for equality to see if only the mode changed.
             if (keyid == (mode_track_last[j] & 0xff)) {
                 kmode = mode_track_last[j] >> 8; // if key was down previously use its original mode
@@ -196,30 +219,45 @@ uint8_t process_keys(uint8_t *keys_down, uint8_t keys_down_n) {
         }
         mode_track[mode_track_n++] = kmode << 8 | keyid; // record current mode
 
-        if (kmode & MODE_FN) {
-            if (kmode & MODE_SHIFTED) keycode = pgm_read_word(fnS_keys+keyid);
-            if (!keycode) keycode = pgm_read_word(fn_keys+keyid); else is_shifted = 1;
-        } else if (kmode & MODE_NAS) {
-            if (kmode & MODE_SHIFTED) keycode = pgm_read_word(nasS_keys+keyid);
-            if (!keycode) keycode = pgm_read_word(nas_keys+keyid); else is_shifted = 1;
-        } else {
-            if (kmode & MODE_SHIFTED) keycode = pgm_read_word(normalS_keys+keyid);
-            if (!keycode) keycode = pgm_read_word(normal_keys+keyid); else is_shifted = 1;
+        // Each of these assigns the shifted value when shift is depressed. if the value in the shifted map is null, it falls back to the unshifted layer's value.
+        switch (kmode & MODES_SINGULAR) {
+            case MODE_FN:
+                table = fn_keys;
+                tableS = fnS_keys;
+                dh_keyboard_modifier_keys &= ~KEY_GUI; // ignore winkey in this mode
+                break;
+            case MODE_NAS:
+                table = nas_keys;
+                tableS = nasS_keys;
+                dh_keyboard_modifier_keys &= ~KEY_GUI; // ignore winkey in this mode
+                break;
+            case MODE_NORMAL:
+            default:
+                table = normal_keys;
+                tableS = normalS_keys;
+                break;
+        }
+        if (kmode & MODE_SHIFTED) {
+            keycode = pgm_read_word(tableS + keyid);
+            if (keycode) is_from_shifted_layer = 1;
+        }
+        if (!keycode) {
+            keycode = pgm_read_word(table + keyid);
         }
 
         if (keycode & 0x80) continue; // f0-ff are special, already handled
 
-        // ninth LSBit of 16-bit keycode means "shifted"
         // keep a count of auto-shifted vs unshifted keys
         if (keycode & 1<<8)
-            auto_shift++;
-        else if (is_shifted)
-            // only count unshifted that are pressed on shifted layers
-            no_auto_shift++;
+            // ninth LSBit of 16-bit keycode means "autoshifted"
+            auto_shifted++;
+        else if (is_from_shifted_layer)
+            // only count non-autoshifted that are pressed on shifted layers
+            non_auto_shifted++;
 
         keycode &= 0xff; // mask to single byte
 
-        if(nkeys>5) break;
+        if(nkeys > 5) break;
         dh_keyboard_keys[nkeys]=keycode;
         nkeys++;
     } // end second pass
@@ -229,14 +267,23 @@ uint8_t process_keys(uint8_t *keys_down, uint8_t keys_down_n) {
         mode_track_last[i] = mode_track[i];
     mode_track_last_n = mode_track_n;
 
-    if (no_auto_shift>0 && mode & MODE_SHIFTED) {
-        if (auto_shift>0) return 0; 
-        // if we pressed an unshifted key from a shifted layer, don't include the shift modifier itself.
-        dh_keyboard_modifier_keys ^= KEY_SHIFT;
-    // we have some auto-shift keys down
-    } else if (auto_shift>0) {
-        if (no_auto_shift>0) return 0; 
-        dh_keyboard_modifier_keys |= KEY_SHIFT;
+    // Decide whether the shift modifier should be applied to all actually depressed keys or not.
+    if (mode & MODE_SHIFTED) {
+        if (non_auto_shifted > 0) {
+            if (auto_shifted > 0) return 0; // abort if both types depressed (this also means nothing gets unpressed)
+
+            // If we pressed an unshifted key from a shifted layer, remove the shift modifier.
+            // This prevents e.g. \ from becoming | (a normally unshifted,but shiftable, key on the QWERTY keymap that's on our shifted layer)
+            dh_keyboard_modifier_keys &= ~KEY_SHIFT;
+        // we have some auto-shift keys down
+        } else {
+            dh_keyboard_modifier_keys |= KEY_SHIFT;
+        }
+    } else {
+        if (auto_shifted > 0) {
+            if (non_auto_shifted > 0) return 0; // abort if both types depressed (this also means nothing gets unpressed)
+            dh_keyboard_modifier_keys |= KEY_SHIFT;
+        }
     }
 
     return usb_keyboard_send(dh_keyboard_keys, dh_keyboard_modifier_keys);
