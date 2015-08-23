@@ -29,7 +29,7 @@
 #define MODE_NAS 1
 #define MODE_FN 2
 #define MODE_SHIFTED 4
-#define MODES_SINGULAR (MODE_NORMAL | MODE_NAS | MODE_FN)
+#define MODE_MASK (MODE_NORMAL | MODE_NAS | MODE_FN)
 
 #define CPU_PRESCALE(n)	(CLKPR = 0x80, CLKPR = (n))
 
@@ -108,7 +108,6 @@ int get_modifiers(uint8_t *keys_down, uint8_t keys_down_n) {
                 break;
             case 0xe3: //LeftGUI
             case 0xe7: //RightGUI
-            //case KEY_DH_NORM:
                 mods |= KEY_GUI;
                 break;
         }
@@ -162,16 +161,21 @@ uint8_t process_keys(uint8_t *keys_down, uint8_t keys_down_n) {
     uint8_t mode_track_n = 0;
     static uint16_t mode_track_last[MODE_TRACK_MAX];
     static uint8_t mode_track_last_n = 0;
-    uint8_t discounted = get_discounted(keys_down, keys_down_n);
-    uint8_t dh_keyboard_modifier_keys = get_modifiers(keys_down, keys_down_n);
-    uint8_t mode = get_modes(keys_down, keys_down_n);
+    uint8_t discounted;
+    uint8_t dh_keyboard_modifier_keys;
+    uint8_t mode;
+    static uint8_t persistent_mode = MODE_NORMAL;
     const uint16_t *table, *tableS;
+
+    discounted = get_discounted(keys_down, keys_down_n);
+    dh_keyboard_modifier_keys = get_modifiers(keys_down, keys_down_n);
+    mode = persistent_mode | get_modes(keys_down, keys_down_n);
 
     // canonicalize the list of keys down by sorting it
     qsort(keys_down, keys_down_n, sizeof(uint8_t), compare);
 
     // Always at least set the mode-LEDs, before returning
-    switch (mode & MODES_SINGULAR) {
+    switch (mode & MODE_MASK) {
         case MODE_FN:
             set_led(LED_FN);
             break;
@@ -220,7 +224,7 @@ uint8_t process_keys(uint8_t *keys_down, uint8_t keys_down_n) {
         mode_track[mode_track_n++] = kmode << 8 | keyid; // record current mode
 
         // Each of these assigns the shifted value when shift is depressed. if the value in the shifted map is null, it falls back to the unshifted layer's value.
-        switch (kmode & MODES_SINGULAR) {
+        switch (kmode & MODE_MASK) {
             case MODE_FN:
                 table = fn_keys;
                 tableS = fnS_keys;
@@ -245,7 +249,19 @@ uint8_t process_keys(uint8_t *keys_down, uint8_t keys_down_n) {
             keycode = pgm_read_word(table + keyid);
         }
 
-        if (keycode & 0x80) continue; // f0-ff are special, already handled
+        // handle mode-switching keys
+        if (keycode & KEY_DH_MASK) {
+            switch (keycode) {
+                case KEY_DH_NORM:
+                    persistent_mode = MODE_NORMAL;
+                    break;
+                case KEY_DH_FN:
+                    persistent_mode = MODE_FN;
+                    break;
+            }
+            // nothing further to do for the modal keys
+            continue;
+        }
 
         // keep a count of auto-shifted vs unshifted keys
         if (keycode & 1<<8)

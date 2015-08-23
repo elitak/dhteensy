@@ -5,3 +5,5 @@
 #define KEY_DH_SHIFT 0xf4
 #define KEY_DH_CTRL 0xf5
 #define KEY_DH_ALT 0xf6
+
+#define KEY_DH_MASK 0x80
