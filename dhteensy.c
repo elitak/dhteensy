@@ -29,7 +29,6 @@
 #define MODE_NAS 1
 #define MODE_FN 2
 #define MODE_SHIFTED 4
-#define MODE_MASK (MODE_NORMAL | MODE_NAS | MODE_FN)
 
 #define CPU_PRESCALE(n)	(CLKPR = 0x80, CLKPR = (n))
 
@@ -64,7 +63,7 @@ int compare (const void * a, const void * b)
 }
 
 int get_modes(uint8_t *keys_down, uint8_t keys_down_n) {
-    int modes = MODE_NORMAL; // = 0
+    int modes = 0;
 
     for (int i=0; i<keys_down_n; i++) { // go through each key that's currently depressed
         int keyid = keys_down[i]; // keyid is the index into our keymapping table
@@ -78,11 +77,13 @@ int get_modes(uint8_t *keys_down, uint8_t keys_down_n) {
             case KEY_DH_FN:
                 modes |= MODE_FN;
                 break;
-        }
-        switch (keycode) {
             case KEY_DH_SHIFT:
                 modes |= MODE_SHIFTED;
                 break;
+            // MODE_NORMAL is 0, so this is implicit
+            //case KEY_DH_NORM:
+            //    modes |= MODE_NORMAL;
+            //    break;
         }
 
     }
@@ -175,17 +176,12 @@ uint8_t process_keys(uint8_t *keys_down, uint8_t keys_down_n) {
     qsort(keys_down, keys_down_n, sizeof(uint8_t), compare);
 
     // Always at least set the mode-LEDs, before returning
-    switch (mode & MODE_MASK) {
-        case MODE_FN:
-            set_led(LED_FN);
-            break;
-        case MODE_NAS:
-            set_led(LED_NAS);
-            break;
-        case MODE_NORMAL:
-        default:
-            set_led(LED_NORM);
-            break;
+    if (MODE_NAS & mode) {
+        set_led(LED_NAS);
+    } else if (MODE_FN & mode) {
+        set_led(LED_FN);
+    } else { //MODE_NORMAL
+        set_led(LED_NORM);
     }
 
     // Detect whether any actionable changes have occurred since previous invocation,
@@ -224,22 +220,18 @@ uint8_t process_keys(uint8_t *keys_down, uint8_t keys_down_n) {
         mode_track[mode_track_n++] = kmode << 8 | keyid; // record current mode
 
         // Each of these assigns the shifted value when shift is depressed. if the value in the shifted map is null, it falls back to the unshifted layer's value.
-        switch (kmode & MODE_MASK) {
-            case MODE_FN:
-                table = fn_keys;
-                tableS = fnS_keys;
-                dh_keyboard_modifier_keys &= ~KEY_GUI; // ignore winkey in this mode
-                break;
-            case MODE_NAS:
-                table = nas_keys;
-                tableS = nasS_keys;
-                dh_keyboard_modifier_keys &= ~KEY_GUI; // ignore winkey in this mode
-                break;
-            case MODE_NORMAL:
-            default:
-                table = normal_keys;
-                tableS = normalS_keys;
-                break;
+        // NB NAS comes first in case FN+NAS is set, NAS takes precedence
+        if        (MODE_NAS & kmode) {
+            table = nas_keys;
+            tableS = nasS_keys;
+            dh_keyboard_modifier_keys &= ~KEY_GUI; // ignore winkey in this mode
+        } else if (MODE_FN & kmode) {
+            table = fn_keys;
+            tableS = fnS_keys;
+            dh_keyboard_modifier_keys &= ~KEY_GUI; // ignore winkey in this mode
+        } else { //MODE_NORMAL
+            table = normal_keys;
+            tableS = normalS_keys;
         }
         if (kmode & MODE_SHIFTED) {
             keycode = pgm_read_word(tableS + keyid);
