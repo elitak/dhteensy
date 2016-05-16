@@ -64,6 +64,7 @@ int compare (const void * a, const void * b)
 
 int get_modes(uint8_t *keys_down, uint8_t keys_down_n) {
     int modes = 0;
+    int gui = 0;
 
     for (int i=0; i<keys_down_n; i++) { // go through each key that's currently depressed
         int keyid = keys_down[i]; // keyid is the index into our keymapping table
@@ -80,6 +81,10 @@ int get_modes(uint8_t *keys_down, uint8_t keys_down_n) {
             case KEY_DH_SHIFT:
                 modes |= MODE_SHIFTED;
                 break;
+            case 0xe3: //LeftGUI
+            case 0xe7: //RightGUI
+                gui = 1;
+                break;
             // MODE_NORMAL is 0, so this is implicit
             //case KEY_DH_NORM:
             //    modes |= MODE_NORMAL;
@@ -87,6 +92,7 @@ int get_modes(uint8_t *keys_down, uint8_t keys_down_n) {
         }
 
     }
+    if ( gui ) modes &= ~MODE_SHIFTED; // assumes winkey is under shift! use other winkey for eg winkey+shift+n
     return modes;
 }
 
@@ -113,6 +119,7 @@ int get_modifiers(uint8_t *keys_down, uint8_t keys_down_n) {
                 break;
         }
     }
+    if ( mods | KEY_GUI ) mods &= ~KEY_SHIFT; // assumes winkey is under shift! use other winkey for eg winkey+shift+n
     return mods;
 }
 
