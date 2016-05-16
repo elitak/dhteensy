@@ -231,11 +231,9 @@ uint8_t process_keys(uint8_t *keys_down, uint8_t keys_down_n) {
         if        (MODE_NAS & kmode) {
             table = nas_keys;
             tableS = nasS_keys;
-            dh_keyboard_modifier_keys &= ~KEY_GUI; // ignore winkey in this mode
         } else if (MODE_FN & kmode) {
             table = fn_keys;
             tableS = fnS_keys;
-            dh_keyboard_modifier_keys &= ~KEY_GUI; // ignore winkey in this mode
         } else { //MODE_NORMAL
             table = normal_keys;
             tableS = normalS_keys;
