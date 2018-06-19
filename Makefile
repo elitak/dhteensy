@@ -260,8 +260,6 @@ LDFLAGS += -Wl,--gc-sections
 LDFLAGS += $(EXTMEMOPTS)
 LDFLAGS += $(patsubst %,-L%,$(EXTRALIBDIRS))
 LDFLAGS += $(PRINTF_LIB) $(SCANF_LIB) $(MATH_LIB)
-#HACK XXX to fix avr-ld not finding this directory. Should be able to delete this line, ideally.
-LDFLAGS += -T /usr/lib64/binutils/avr/2.24/ldscripts/avr51.xn
 
 
 

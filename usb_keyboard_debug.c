@@ -73,7 +73,7 @@
 #define DEBUG_TX_SIZE		32
 #define DEBUG_TX_BUFFER		EP_DOUBLE_BUFFER
 
-const const uint8_t PROGMEM endpoint_config_table[] = {
+const uint8_t PROGMEM endpoint_config_table[] = {
 	0,
 	0,
 	1, EP_TYPE_INTERRUPT_IN,  EP_SIZE(KEYBOARD_SIZE) | KEYBOARD_BUFFER,
