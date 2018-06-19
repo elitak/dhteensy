@@ -12,5 +12,6 @@ stdenv.mkDerivation {
   shellHook = ''
     export CFLAGS+=" -I${avrlibc}/avr/include"
     export CFLAGS+=" -L${avrlibc}/avr/lib/avr51"
+    cp ${avrlibc}/avr/lib/avr51/crtat90usb1286.o . # XXX linker can't find this otherwise FIXME
   '';
 }
